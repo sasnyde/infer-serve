@@ -39,6 +39,7 @@ def call(method, path, body=None, timeout=60):
         headers={
             "Authorization": f"Bearer {key('RUNPOD_API_KEY')}",
             "Content-Type": "application/json",
+            "User-Agent": "muse-serve/1.0",
         },
     )
     try:
@@ -59,7 +60,7 @@ def base_url(pod_id):
 
 
 def http_code(url, bearer=None, body=None, timeout=30):
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "User-Agent": "muse-serve/1.0"}
     if bearer:
         headers["Authorization"] = f"Bearer {bearer}"
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body else None,
