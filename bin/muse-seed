@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Seed the volume mirror for one profile without serving: muse-seed <profile-name>
+# Downloads to local disk first, then copies to the volume and writes .complete.
+set -Eeuo pipefail
+# shellcheck disable=SC1091
+. /usr/local/lib/muse/muse-lib.sh
+[ $# -eq 1 ] || die "usage: muse-seed <profile-name>"
+MUSE_PROFILE="$1"
+resolve_profile
+MUSE_MIRROR=1
+stage_model
+log "seeded $MODEL_NAME -> $MUSE_DIR/models/$MODEL_NAME"
+ls -lh "$MUSE_DIR/models/$MODEL_NAME" | head -n 20

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Local gateway checks. Exit 0 only if every expectation holds.
+# Usage inside the Pod: muse-check   (reads MUSE_API_KEY and the active profile)
+set -u
+# shellcheck disable=SC1091
+. /usr/local/lib/muse/muse-lib.sh
+BASE="${MUSE_CHECK_BASE:-http://127.0.0.1:8000}"
+if [ -z "${MODEL_REPO:-}" ]; then resolve_profile >/dev/null; fi
+if [ -z "${MUSE_API_KEY:-}" ]; then resolve_key >/dev/null; fi
+KEY="$MUSE_API_KEY"
+MODEL="${SERVED_MODEL_NAME:-$MODEL_REPO}"
+fail=0
+code() { curl -sS -o /dev/null --max-time 20 -w '%{http_code}' "$@"; }
+expect() { local want="$1" got="$2" label="$3"
+  if [ "$got" = "$want" ]; then echo "ok    $label -> $got"; else echo "FAIL  $label -> $got (want $want)"; fail=1; fi; }
+
+expect 401 "$(code "$BASE/v1/models")"                                        "no key, /v1/models"
+expect 200 "$(code "$BASE/v1/models" -H "Authorization: Bearer $KEY")"        "with key, /v1/models"
+expect 404 "$(code "$BASE/invocations")"                                      "blocked route /invocations"
+expect 404 "$(code "$BASE/metrics")"                                          "blocked route /metrics"
+ip="$(hostname -i 2>/dev/null | awk '{print $1}')"
+if [ -n "$ip" ]; then expect 401 "$(code "http://$ip:8000/v1/models")" "container IP, no key"; fi
+
+body=$(curl -sS --max-time 120 -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
+  "$BASE/v1/chat/completions" \
+  -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"Say hello in one sentence.\"}],\"max_tokens\":1024}")
+if printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); c=d["choices"][0]["message"]["content"]; assert c and c.strip(); print("ok    chat completion ->", c.strip()[:60])'; then :; else
+  echo "FAIL  chat completion -> $(printf '%s' "$body" | head -c 300)"; fail=1
+fi
+exit $fail
