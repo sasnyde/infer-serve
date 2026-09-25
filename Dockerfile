@@ -1,4 +1,4 @@
-# muse-serve — vLLM + Nginx gateway for Runpod Pods (RTX PRO 6000 Blackwell / RTX 5090, sm120)
+# infer-serve — vLLM + Nginx gateway for Runpod Pods (RTX PRO 6000 Blackwell / RTX 5090, sm120)
 # Build for linux/amd64. Pinned base: the vLLM version verified on the 6000 PRO deployment.
 ARG VLLM_TAG=v0.30.0
 FROM vllm/vllm-openai:${VLLM_TAG}
@@ -16,16 +16,16 @@ RUN apt-get update \
 RUN uv pip install --system "transformers==${TRANSFORMERS_PIN}" hf_transfer
 
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY bin/muse-lib.sh /usr/local/lib/muse/muse-lib.sh
+COPY bin/infer-lib.sh /usr/local/lib/infer/infer-lib.sh
 COPY bin/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY bin/muse-seed /usr/local/bin/muse-seed
-COPY bin/muse-check /usr/local/bin/muse-check
-COPY bin/muse-init-volume /usr/local/bin/muse-init-volume
-COPY profiles/ /opt/muse/profiles/
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/muse-seed /usr/local/bin/muse-check /usr/local/bin/muse-init-volume \
+COPY bin/infer-seed /usr/local/bin/infer-seed
+COPY bin/infer-check /usr/local/bin/infer-check
+COPY bin/infer-init-volume /usr/local/bin/infer-init-volume
+COPY profiles/ /opt/infer/profiles/
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/infer-seed /usr/local/bin/infer-check /usr/local/bin/infer-init-volume \
  && nginx -t
 
-ENV MUSE_VOLUME=/workspace \
+ENV INFER_VOLUME=/workspace \
     HF_HUB_ENABLE_HF_TRANSFER=1 \
     VLLM_USE_DEEP_GEMM=0 \
     VLLM_MOE_USE_DEEP_GEMM=0 \

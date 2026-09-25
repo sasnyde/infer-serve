@@ -1,5 +1,5 @@
-# Optional: build and push the image from GitHub instead of the Mac.
-# Trigger: push a tag like v0.30.0-3, or run manually. Image: ghcr.io/<owner>/muse-serve:<tag>
+# Builds the image on GitHub and pushes it to GHCR. No Docker needed on the Mac.
+# Trigger: push a tag like v0.30.0-1 (image tag = git tag), or run manually from the Actions tab.
 name: build-image
 on:
   push:
@@ -20,6 +20,10 @@ jobs:
           haskell: true
           large-packages: true
       - uses: actions/checkout@v4
+      - id: meta
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -31,4 +35,5 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/muse-serve:${{ github.ref_name }}
+          tags: ghcr.io/${{ steps.meta.outputs.owner }}/infer-serve:${{ steps.meta.outputs.tag }}
+      - run: echo "pushed ghcr.io/${{ steps.meta.outputs.owner }}/infer-serve:${{ steps.meta.outputs.tag }}"

@@ -1,63 +1,63 @@
 #!/usr/bin/env bash
-# Shared functions for entrypoint.sh, muse-seed and muse-init-volume.
-# Precedence: profile file < local.env < local.<profile>.env < MUSE_OVERRIDE env. Template/deploy env
-# supplies MUSE_PROFILE, MUSE_OVERRIDE, MUSE_API_KEY, MUSE_MODE and PUBLIC_KEY.
+# Shared functions for entrypoint.sh, infer-seed and infer-init-volume.
+# Precedence: profile file < local.env < local.<profile>.env < INFER_OVERRIDE env. Template/deploy env
+# supplies INFER_PROFILE, INFER_OVERRIDE, INFER_API_KEY, INFER_MODE and PUBLIC_KEY.
 
-MUSE_VOLUME="${MUSE_VOLUME:-/workspace}"
-MUSE_DIR="$MUSE_VOLUME/muse"
+INFER_VOLUME="${INFER_VOLUME:-/workspace}"
+INFER_DIR="$INFER_VOLUME/infer"
 LOCAL_MODELS="${LOCAL_MODELS:-/tmp/models}"
 
-log() { printf '[muse %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
+log() { printf '[infer %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
 die() { log "ERROR: $*"; exit 1; }
 
-# Resolve which profile to run: MUSE_PROFILE env wins, else the active-profile file.
+# Resolve which profile to run: INFER_PROFILE env wins, else the active-profile file.
 resolve_profile() {
-  if [ -z "${MUSE_PROFILE:-}" ] && [ -s "$MUSE_DIR/active-profile" ]; then
-    MUSE_PROFILE="$(tr -d '[:space:]' < "$MUSE_DIR/active-profile")"
+  if [ -z "${INFER_PROFILE:-}" ] && [ -s "$INFER_DIR/active-profile" ]; then
+    INFER_PROFILE="$(tr -d '[:space:]' < "$INFER_DIR/active-profile")"
   fi
-  [ -n "${MUSE_PROFILE:-}" ] || die "no profile: set MUSE_PROFILE or write $MUSE_DIR/active-profile"
-  PROFILE_FILE="$MUSE_DIR/profiles/$MUSE_PROFILE.env"
-  [ -s "$PROFILE_FILE" ] || die "profile file missing: $PROFILE_FILE (run muse-init-volume, or check the name)"
+  [ -n "${INFER_PROFILE:-}" ] || die "no profile: set INFER_PROFILE or write $INFER_DIR/active-profile"
+  PROFILE_FILE="$INFER_DIR/profiles/$INFER_PROFILE.env"
+  [ -s "$PROFILE_FILE" ] || die "profile file missing: $PROFILE_FILE (run infer-init-volume, or check the name)"
   set -a
   # shellcheck disable=SC1090
   . "$PROFILE_FILE"
   local ov
-  for ov in "$MUSE_DIR/local.env" "$MUSE_DIR/local.$MUSE_PROFILE.env"; do
+  for ov in "$INFER_DIR/local.env" "$INFER_DIR/local.$INFER_PROFILE.env"; do
     if [ -s "$ov" ]; then
       # shellcheck disable=SC1090
       . "$ov"
       log "applied $(basename "$ov")"
     fi
   done
-  # Deploy-form overrides, applied last: MUSE_OVERRIDE="MAX_SEQS=8 GPU_UTIL=0.85"
-  if [ -n "${MUSE_OVERRIDE:-}" ]; then
+  # Deploy-form overrides, applied last: INFER_OVERRIDE="MAX_SEQS=8 GPU_UTIL=0.85"
+  if [ -n "${INFER_OVERRIDE:-}" ]; then
     local kv
-    for kv in $MUSE_OVERRIDE; do
-      case "$kv" in *=*) export "$kv"; log "override $kv" ;; *) die "bad MUSE_OVERRIDE entry: $kv" ;; esac
+    for kv in $INFER_OVERRIDE; do
+      case "$kv" in *=*) export "$kv"; log "override $kv" ;; *) die "bad INFER_OVERRIDE entry: $kv" ;; esac
     done
   fi
   set +a
-  [ -n "${MODEL_NAME:-}" ] || die "profile $MUSE_PROFILE sets no MODEL_NAME"
-  [ -n "${MODEL_REPO:-}" ] || die "profile $MUSE_PROFILE sets no MODEL_REPO"
-  log "profile=$MUSE_PROFILE model=$MODEL_NAME repo=$MODEL_REPO"
+  [ -n "${MODEL_NAME:-}" ] || die "profile $INFER_PROFILE sets no MODEL_NAME"
+  [ -n "${MODEL_REPO:-}" ] || die "profile $INFER_PROFILE sets no MODEL_REPO"
+  log "profile=$INFER_PROFILE model=$MODEL_NAME repo=$MODEL_REPO"
 }
 
-# Resolve the serving key: Runpod Secret (MUSE_API_KEY) wins; the legacy key file is the fallback.
+# Resolve the serving key: Runpod Secret (INFER_API_KEY) wins; the legacy key file is the fallback.
 resolve_key() {
-  case "${MUSE_API_KEY:-}" in
-    ""|*RUNPOD_SECRET*) MUSE_API_KEY="" ;;
+  case "${INFER_API_KEY:-}" in
+    ""|*RUNPOD_SECRET*) INFER_API_KEY="" ;;
   esac
-  if [ -n "$MUSE_API_KEY" ]; then
+  if [ -n "$INFER_API_KEY" ]; then
     KEY_SOURCE=secret
-  elif [ -s "$MUSE_VOLUME/muse-api-key" ]; then
-    MUSE_API_KEY="$(tr -d '\r\n' < "$MUSE_VOLUME/muse-api-key")"
+  elif [ -s "$INFER_VOLUME/muse-api-key" ]; then
+    INFER_API_KEY="$(tr -d '\r\n' < "$INFER_VOLUME/muse-api-key")"
     KEY_SOURCE=file
   else
-    die "no API key: map the muse_api_key Secret in the template, or keep $MUSE_VOLUME/muse-api-key"
+    die "no API key: map the muse_api_key Secret in the template, or keep $INFER_VOLUME/muse-api-key"
   fi
-  [ -n "$MUSE_API_KEY" ] || die "API key resolved to an empty string"
-  export MUSE_API_KEY VLLM_API_KEY="$MUSE_API_KEY"
-  log "api key source: $KEY_SOURCE (${#MUSE_API_KEY} chars)"
+  [ -n "$INFER_API_KEY" ] || die "API key resolved to an empty string"
+  export INFER_API_KEY VLLM_API_KEY="$INFER_API_KEY"
+  log "api key source: $KEY_SOURCE (${#INFER_API_KEY} chars)"
 }
 
 start_sshd() {
@@ -89,7 +89,7 @@ PY
 # Stage the model onto local disk. Order: volume mirror -> local; else Hub -> local -> volume mirror.
 # The volume is a FUSE object store: vLLM must never open safetensors on it directly.
 stage_model() {
-  local src="$MUSE_DIR/models/$MODEL_NAME" dst="$LOCAL_MODELS/$MODEL_NAME"
+  local src="$INFER_DIR/models/$MODEL_NAME" dst="$LOCAL_MODELS/$MODEL_NAME"
   mkdir -p "$LOCAL_MODELS"
   if [ -d "$dst" ] && [ -f "$dst/.complete" ]; then
     log "local copy already present: $dst"
@@ -106,10 +106,10 @@ stage_model() {
     download_model "$dst"
     touch "$dst/.complete"
     log "download took $(( $(date +%s) - t0 ))s; $(du -sh "$dst" | cut -f1)"
-    if [ "${MUSE_MIRROR:-1}" = "1" ]; then
+    if [ "${INFER_MIRROR:-1}" = "1" ]; then
       log "mirroring to volume: $src"
       rm -rf "$src"
-      mkdir -p "$MUSE_DIR/models"
+      mkdir -p "$INFER_DIR/models"
       cp -r "$dst" "$src"
       log "mirror complete"
     fi

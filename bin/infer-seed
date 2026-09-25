@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Seed the volume mirror for one profile without serving: infer-seed <profile-name>
+# Downloads to local disk first, then copies to the volume and writes .complete.
+set -Eeuo pipefail
+# shellcheck disable=SC1091
+. /usr/local/lib/infer/infer-lib.sh
+[ $# -eq 1 ] || die "usage: infer-seed <profile-name>"
+INFER_PROFILE="$1"
+resolve_profile
+INFER_MIRROR=1
+stage_model
+log "seeded $MODEL_NAME -> $INFER_DIR/models/$MODEL_NAME"
+ls -lh "$INFER_DIR/models/$MODEL_NAME" | head -n 20

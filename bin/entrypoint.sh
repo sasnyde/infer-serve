@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Container entrypoint. MUSE_MODE=serve (default) stages the model and serves it.
-# MUSE_MODE=setup starts sshd and waits, for seeding the volume or quantizing.
+# Container entrypoint. INFER_MODE=serve (default) stages the model and serves it.
+# INFER_MODE=setup starts sshd and waits, for seeding the volume or quantizing.
 set -Eeuo pipefail
 # shellcheck disable=SC1091
-. /usr/local/lib/muse/muse-lib.sh
+. /usr/local/lib/infer/infer-lib.sh
 
-exec > >(tee -a /tmp/muse.log) 2>&1
-log "muse-serve starting; mode=${MUSE_MODE:-serve}; gpu=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo unknown)"
-[ -d "$MUSE_VOLUME" ] || die "volume not mounted at $MUSE_VOLUME"
+exec > >(tee -a /tmp/infer.log) 2>&1
+log "infer-serve starting; mode=${INFER_MODE:-serve}; gpu=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo unknown)"
+[ -d "$INFER_VOLUME" ] || die "volume not mounted at $INFER_VOLUME"
 
 start_sshd
 
-if [ "${MUSE_MODE:-serve}" = "setup" ]; then
-  log "setup mode: no model server. SSH in, then run muse-init-volume / muse-seed <profile>."
+if [ "${INFER_MODE:-serve}" = "setup" ]; then
+  log "setup mode: no model server. SSH in, then run infer-init-volume / infer-seed <profile>."
   exec sleep infinity
 fi
 

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""muse.py — Runpod v2 API helper for muse-serve Pods. Standard library only.
+"""infer.py — Runpod v2 API helper for infer-serve Pods. Standard library only.
 
   export RUNPOD_API_KEY=...    # account API key (Runpod console)
-  export MUSE_API_KEY=...      # model-serving bearer key (same value as the muse_api_key Secret)
+  export INFER_API_KEY=...      # model-serving bearer key (same value as the muse_api_key Secret)
 
-  muse.py list                         pods: id, name, status, gpu, $/h
-  muse.py status <pod_id>              one pod, raw fields that matter
-  muse.py url <pod_id>                 print the public base URL
-  muse.py env <pod_id>                 print the lines for the web app's .env file
-  muse.py wait <pod_id> [--chat]       block until RUNNING and /v1/models returns 200; --chat sends one request
-  muse.py stop <pod_id>                release the GPU, keep the Pod ID (container disk is wiped)
-  muse.py start <pod_id>               boot a stopped Pod (same ID and URL; GPU may be unavailable)
-  muse.py terminate <pod_id>           delete the Pod (the global volume is untouched)
-  muse.py template <name> <image>      create a Pod template via API (console works too; see runbook)
+  infer.py list                         pods: id, name, status, gpu, $/h
+  infer.py status <pod_id>              one pod, raw fields that matter
+  infer.py url <pod_id>                 print the public base URL
+  infer.py env <pod_id>                 print the lines for the web app's .env file
+  infer.py wait <pod_id> [--chat]       block until RUNNING and /v1/models returns 200; --chat sends one request
+  infer.py stop <pod_id>                release the GPU, keep the Pod ID (container disk is wiped)
+  infer.py start <pod_id>               boot a stopped Pod (same ID and URL; GPU may be unavailable)
+  infer.py terminate <pod_id>           delete the Pod (the global volume is untouched)
+  infer.py template <name> <image>      create a Pod template via API (console works too; see runbook)
 """
 import json
 import os
@@ -39,7 +39,7 @@ def call(method, path, body=None, timeout=60):
         headers={
             "Authorization": f"Bearer {key('RUNPOD_API_KEY')}",
             "Content-Type": "application/json",
-            "User-Agent": "muse-serve/1.0",
+            "User-Agent": "infer-serve/1.0",
         },
     )
     try:
@@ -60,7 +60,7 @@ def base_url(pod_id):
 
 
 def http_code(url, bearer=None, body=None, timeout=30):
-    headers = {"Content-Type": "application/json", "User-Agent": "muse-serve/1.0"}
+    headers = {"Content-Type": "application/json", "User-Agent": "infer-serve/1.0"}
     if bearer:
         headers["Authorization"] = f"Bearer {bearer}"
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body else None,
@@ -76,14 +76,14 @@ def http_code(url, bearer=None, body=None, timeout=30):
 
 def print_env(pod_id, model=None):
     print("Add to the web app .env (the key is the muse_api_key Secret value; it does not change):")
-    print(f"MUSE_BASE_URL={base_url(pod_id)}")
-    print("MUSE_API_KEY=<value of the muse_api_key Runpod Secret>")
+    print(f"INFER_BASE_URL={base_url(pod_id)}")
+    print("INFER_API_KEY=<value of the muse_api_key Runpod Secret>")
     if model:
-        print(f"MUSE_MODEL={model}")
+        print(f"INFER_MODEL={model}")
 
 
 def cmd_env(pod_id):
-    bearer = os.environ.get("MUSE_API_KEY")
+    bearer = os.environ.get("INFER_API_KEY")
     model = None
     if bearer:
         code, body = http_code(f"{base_url(pod_id)}/models", bearer)
@@ -91,7 +91,7 @@ def cmd_env(pod_id):
             ids = [m.get("id") for m in json.loads(body).get("data", [])]
             model = ids[0] if ids else None
         else:
-            print(f"note: the Pod is not answering yet (HTTP {code}); MUSE_MODEL omitted")
+            print(f"note: the Pod is not answering yet (HTTP {code}); INFER_MODEL omitted")
     print_env(pod_id, model)
 
 
@@ -138,7 +138,7 @@ def cmd_wait(pod_id, chat=False, timeout_s=2400):
         sys.exit("timed out waiting for RUNNING")
 
     url = base_url(pod_id)
-    bearer = key("MUSE_API_KEY")
+    bearer = key("INFER_API_KEY")
     print(f"[{int(time.time() - t0):4d}s] container is up; waiting for the model (weights copy + vLLM init)")
     while time.time() - t0 < timeout_s:
         code, body = http_code(f"{url}/models", bearer)
@@ -191,9 +191,9 @@ def cmd_template(name, image):
         "disk": 100,
         "ports": ["8000/http", "22/tcp"],
         "env": {
-            "MUSE_API_KEY": "{{ RUNPOD_SECRET_muse_api_key }}",
-            "MUSE_MODE": "serve",
-            "MUSE_PROFILE": "muse-fp8-6000",
+            "INFER_API_KEY": "{{ RUNPOD_SECRET_muse_api_key }}",
+            "INFER_MODE": "serve",
+            "INFER_PROFILE": "muse-fp8-6000",
         },
     }
     code, data = call("POST", "/templates", body)
